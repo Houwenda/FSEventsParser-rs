@@ -9,4 +9,3 @@ edition = "2021"
 clap = { version = "3.2.22", features = ["derive"] }
 regex = "1.6.0"
 flate2 = "1.0.24"
-bytes = "1.2.1"

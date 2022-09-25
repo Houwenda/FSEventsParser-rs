@@ -24,15 +24,18 @@ pub fn find_archives(dir: &str) -> Vec<String> {
 }
 
 pub fn parse_archive(file_path: &str) -> Option<Archive> {
-    println!("parsing file: {}", file_path);
-
-    // parse from memory
+    // parse from compressed file
     let parse_result = Archive::new(file_path);
-
     match parse_result {
-        Ok(result) => {
-            println!("succeed to parse: {:?}", result);
-            Some(result)
+        Ok(archive) => {
+            if archive.pages.len() == 0 {
+                println!("archive contains no pages");
+                return None;
+            }
+
+            // println!("parse archive {} succeeded, page count: {}", 
+            //     archive.filename, archive.pages.len());
+            Some(archive)
         },
         Err(e) => {
             println!("failed to parse: {:?}", e);
@@ -69,16 +72,19 @@ impl Archive {
         let mut buf = Vec::new();
         let fd = fs::File::open(path)?;
         let mut decoder = MultiGzDecoder::new(fd);
-        let out_size = decoder.read_to_end(&mut buf)?;
-        println!("uncompressed size: {}", out_size);
+        decoder.read_to_end(&mut buf)?;
+        // println!("uncompressed size: {} {}", filename, buf.len());
 
         // parse all pages
+        let mut pages = vec![];
         let mut offset: usize = 0;
-        while offset < out_size {
+        while offset < buf.len() {
             match Page::new(&buf[offset..]) {
                 Ok((page, consumed)) => {
-                    println!("succeed to parse page: {:?}", page);
                     offset += consumed;
+                    // println!("parse page succeeded: {:?}, entry count: {}, page consumed: {}, stream left: {}", 
+                    //     page.header, page.entries.len(), consumed, buf.len() - offset);
+                    pages.push(page);
                 }, 
                 Err(e) => {
                     println!("encountered error when parsing page,
@@ -89,7 +95,7 @@ impl Archive {
         }
 
         Ok(Archive {
-            pages: vec![], 
+            pages,  
             filename, 
             mtime: metadata.modified()?,
             ctime: metadata.created()?, 
@@ -122,13 +128,56 @@ impl Page {
         }
 
         // parse entries by length
-        println!("parsing entries in page, size: {}", header.stream_size);
+        // println!("parsing entries in page, size: {}", header.stream_size);
         offset += PageHeader::len(); // skip header
         let mut entries = vec![];
-        while offset < header.stream_size as usize {
-            // TODO
-            break;
-            
+        while offset < header.stream_size as usize && 
+              offset < mem.len()-1 {
+            if let Some(path_len) = mem[offset..]
+                                                .iter()
+                                                .position(|&r| r == 0) {
+                /*
+                 * | full path | end with 0x00
+                 * | event id | 8 bytes
+                 * | event flags | 4 bytes
+                 * | node id | 8 bytes
+                 */
+                                                
+                // path can be empty? offset == end_offset
+                let end_offset = offset + path_len;
+                if end_offset + 20 >= mem.len() { // other attributes
+                    println!("invalid record for path, stop parsing page: {:?}", &mem[offset..end_offset+1]);
+                    break;
+                }
+
+                let full_path = String::from_utf8_lossy(&mem[offset..end_offset+1]).into_owned();
+                offset = end_offset + 1; // skip 0x00
+                // println!("found path: {}", full_path);
+
+                // event id
+                let event_id = u64::from_le_bytes(mem[offset..offset+8].try_into()?);
+                offset += 8;
+                // println!("event id: {}", event_id);
+
+                // flags
+                let flags = u32::from_le_bytes(mem[offset..offset+4].try_into()?);
+                offset += 4;
+                // println!("event flags: {}", flags);
+
+                // skip node id
+                offset += 8;
+
+                // new entry generated
+                entries.push(Entry { 
+                    full_path, 
+                    event_id, 
+                    flags, 
+                });
+
+            } else { // no 0x00 any more
+                offset = mem.len();
+                break;
+            }
         }
 
         Ok((Page{
@@ -183,8 +232,15 @@ impl PageHeader {
 
 #[derive(Debug)]
 pub struct Entry {
-
+    pub full_path: String, 
+    pub event_id: u64,
+    pub flags: u32, 
 }
+
+impl Entry {
+
+} // impl Entry
+
 
 #[derive(Debug)]
 pub enum ParseError {
