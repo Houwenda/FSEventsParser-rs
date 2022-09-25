@@ -1,7 +1,8 @@
-use std::{fs, io::Read, fmt};
-
+use std::{fs, fmt};
+use std::io::Read;
 use regex::Regex;
-use flate2::read::GzDecoder;
+
+use flate2::read::MultiGzDecoder;
 
 pub fn find_archives(dir: &str) -> Vec<String> {
     let fname_re = Regex::new("^[0-9a-f]{16}$").unwrap();
@@ -51,7 +52,7 @@ pub struct Archive {
 
 impl Archive {
     pub fn new(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        // timestamp
+        // timestamp & filename
         let metadata = fs::metadata(path)?;
         let filename = match std::path::Path::new(path).file_name() {
             Some(s) => match s.to_str() {
@@ -67,7 +68,7 @@ impl Archive {
         // uncompress
         let mut buf = Vec::new();
         let fd = fs::File::open(path)?;
-        let mut decoder = GzDecoder::new(fd);
+        let mut decoder = MultiGzDecoder::new(fd);
         let out_size = decoder.read_to_end(&mut buf)?;
         println!("uncompressed size: {}", out_size);
 
@@ -94,16 +95,8 @@ impl Archive {
             ctime: metadata.created()?, 
         })
     }
-
-    pub fn is_timestamp_credible(&self) -> bool {
-        self.mtime != self.ctime
-    }
 } // impl Archive
 
-#[derive(Debug)]
-pub struct PageHeader {
-
-}
 
 #[derive(Debug)]
 pub struct Page {
@@ -114,33 +107,115 @@ pub struct Page {
 impl Page {
     // usize consumed
     pub fn new(mem: &[u8]) -> Result<(Self, usize), Box<dyn std::error::Error>> {
-        // TODO: parse from memory
-        // find page magic
-        // parse length from header
-        // parse entries by length
 
-        // let offset = mem.windows(4).position(|window| window == b"2SLD");
-        // if offset == None {
-        //     return Err(Box::new(ParseError));
-        // }
-        // let offset = offset?;
+        // find page magic
+        let offset = mem.windows(4).position(|window| window == b"2SLD");
+        let mut offset = offset.unwrap_or(usize::MAX);
+        if offset > mem.len() {
+            return Err(Box::new(ParseError::NoPageFound));
+        }
+
+        // parse header
+        let header = PageHeader::new(&mem[offset..])?;
+        if matches!(header.version, Version::V1) {
+            return Err(Box::new(ParseError::UnsupportedVersion));
+        }
+
+        // parse entries by length
+        println!("parsing entries in page, size: {}", header.stream_size);
+        offset += PageHeader::len(); // skip header
+        let mut entries = vec![];
+        while offset < header.stream_size as usize {
+            // TODO
+            break;
+            
+        }
 
         Ok((Page{
-            header: PageHeader {}, 
-            entries: vec![], 
-        }, 0)) // mem len actually consumed
+            header, 
+            entries, 
+        }, offset)) // mem len actually consumed
     }
 } // impl Page
+
+
+#[derive(Debug)]
+pub struct PageHeader {
+    version: Version,
+    stream_size: u32,
+}
+#[derive(Debug)]
+pub enum Version { Unkown, V1, V2, }
+impl PageHeader {
+    pub fn new(mem: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        // validate len
+        if mem.len() < Self::len()+1 {
+            return Err(Box::new(ParseError::InvalidHeader));
+        }
+
+        // parse version
+        let mut version = Version::Unkown;
+        if mem.starts_with(b"1SLD") {
+            version = Version::V1;
+        } else if mem.starts_with(b"2SLD") {
+            version = Version::V2
+        }
+        if matches!(version, Version::Unkown) {
+            return Err(Box::new(ParseError::InvalidHeader));
+        }
+
+        // parse len
+        let len = u32::from_le_bytes(mem[8..12].try_into()?);
+        if len as usize > mem.len() {
+            return Err(Box::new(ParseError::InvalidHeader));
+        }
+
+        Ok(PageHeader { 
+            version, 
+            stream_size: len, 
+        })
+    }
+
+    pub fn len() -> usize {
+        12
+    }
+} // impl PageHeader
 
 #[derive(Debug)]
 pub struct Entry {
 
 }
 
-#[derive(Debug, Clone)]
-pub struct ParseError;
+#[derive(Debug)]
+pub enum ParseError {
+    NoPageFound,
+    InvalidHeader, 
+    UnsupportedVersion, 
+    IoError(std::io::Error), 
+}
+impl std::error::Error for ParseError {
+
+}
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "failed to parse")
+        match self {
+            ParseError::NoPageFound => {
+                write!(f, "no page found")
+            }, 
+            ParseError::InvalidHeader => {
+                write!(f, "invalid header")
+            }
+            ParseError::UnsupportedVersion => {
+                write!(f, "page version not supported")
+            }
+            ParseError::IoError(e) => {
+                write!(f, "{}", e)
+            }
+        }
+    }
+}
+impl From<std::io::Error> for ParseError {
+    fn from(err: std::io::Error) -> Self {
+        ParseError::IoError(err)
     }
 }
