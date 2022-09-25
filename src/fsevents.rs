@@ -3,6 +3,7 @@ use std::io::Read;
 use regex::Regex;
 
 use flate2::read::MultiGzDecoder;
+use bitflags::bitflags;
 
 pub fn find_archives(dir: &str) -> Vec<String> {
     let fname_re = Regex::new("^[0-9a-f]{16}$").unwrap();
@@ -171,7 +172,7 @@ impl Page {
                 entries.push(Entry { 
                     full_path, 
                     event_id, 
-                    flags, 
+                    flags: EventFlag::from_bits_truncate(flags), 
                 });
 
             } else { // no 0x00 any more
@@ -234,12 +235,43 @@ impl PageHeader {
 pub struct Entry {
     pub full_path: String, 
     pub event_id: u64,
-    pub flags: u32, 
+    pub flags: EventFlag, 
 }
 
-impl Entry {
+bitflags! {
+    pub struct EventFlag : u32 {
+        const FSE_NONE = 0x00000000;
 
-} // impl Entry
+        const FSE_CREATE_FILE = 0x00000001;  
+        const FSE_DELETE = 0x00000002; 
+        const FSE_STAT_CHANGED = 0x00000004; 
+        const FSE_RENAME = 0x00000008; 
+        const FSE_CONTENT_MODIFIED = 0x00000010; 
+        const FSE_EXCHANGE = 0x00000020; 
+        const FSE_FINDER_INFO_CHANGED = 0x00000040; 
+        const FSE_CREATE_DIR = 0x00000080;
+        const FSE_CHOWN = 0x00000100;
+        const FSE_XATTR_MODIFIED = 0x00000200;
+        const FSE_XATTR_REMOVED = 0x00000400;
+        const FSE_DOCID_CREATED = 0x00000800;
+        const FSE_DOCID_CHANGED = 0x00001000;
+        const FSE_UNMOUNT_PENDING = 0x00002000;
+        const FSE_CLONE = 0x00004000;
+        const FSE_MODE_CLONE = 0x00010000;
+        const FSE_TRUNCATED_PATH = 0x00020000;
+        const FSE_REMOTE_DIR_EVENT = 0x00040000;
+        const FSE_MODE_LAST_HLINK = 0x00080000;
+        const FSE_MODE_HLINK = 0x00100000;
+        
+        const FSE_IS_SYMLINK = 0x00400000;
+        const FSE_IS_FILE = 0x00800000;
+        const FSE_IS_DIR = 0x01000000;
+        const FSE_MOUNT = 0x02000000;
+        const FSE_UNMOUNT = 0x04000000;
+
+        const FSE_END_TRANSACTION = 0x20000000;
+    }
+}
 
 
 #[derive(Debug)]
