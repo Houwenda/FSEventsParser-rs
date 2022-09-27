@@ -151,7 +151,7 @@ impl Page {
                     break;
                 }
 
-                let full_path = String::from_utf8_lossy(&mem[offset..end_offset+1]).into_owned();
+                let full_path = String::from_utf8_lossy(&mem[offset..end_offset]).into_owned();
                 offset = end_offset + 1; // skip 0x00
                 // println!("found path: {}", full_path);
 
