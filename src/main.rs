@@ -26,30 +26,55 @@ fn main() {
 fn parse_and_export(archive_files: &Vec<String>, 
                     output_path: &str, 
                     format: ArgsOutputFormat) {
-
-    if !matches!(format, ArgsOutputFormat::Json) {
-        todo!()
-    }
-    
-    match registry::json_registry::JsonRegistry::new(output_path) {
-        Ok(mut r) => {
-            // parse fsevents and save
-            archive_files.iter().for_each(|f| {
-                if let Some(archive) = fsevents::parse_archive(f) {
-                    println!("---------- {} ----------", archive.filename);
-                    println!("page count: {}", archive.pages.len());
-                    archive.pages.iter().for_each(|p| {
-                        println!("entry count: {}", p.entries.len());
-                    });
-
-                    r.export_archive(&archive);
+    // create registry
+    let mut reg: Box<dyn Registry>;
+    match format {
+        ArgsOutputFormat::Json => {
+            match registry::json::JsonRegistry::new(output_path) {
+                Ok(r) => {
+                    reg = r;
+                },
+                Err(e) => {
+                    println!("failed to create registry: {}", e);
+                    return;
                 }
-            });
-        },
-        Err(e) => {
-            println!("failed to create registry: {}", e);
-            return;
+            }
+        }, 
+        ArgsOutputFormat::Csv => {
+            match registry::csv::CsvRegistry::new(output_path) {
+                Ok(r) => {
+                    reg = r;
+                }, 
+                Err(e) => {
+                    println!("failed to create csv registry: {}", e);
+                    return;
+                }
+            }
+        }, 
+        ArgsOutputFormat::Sqlite => {
+            match registry::sqlite::SqliteRegistry::new(output_path) {
+                Ok(r) => {
+                    reg = r;
+                }, 
+                Err(e) => {
+                    println!("failed to create sqlite registry: {}", e);
+                    return;
+                }
+            }
         }
     }
     
+    // parse fsevents and save
+    archive_files.iter().for_each(|f| {
+        if let Some(archive) = fsevents::parse_archive(f) {
+            println!("---------- {} ----------", archive.filename);
+            println!("page count: {}", archive.pages.len());
+            archive.pages.iter().for_each(|p| {
+                println!("entry count: {}", p.entries.len());
+            });
+
+            reg.export_archive(&archive);
+        }
+    });        
+
 }
