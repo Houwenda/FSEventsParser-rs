@@ -88,8 +88,7 @@ impl Archive {
                     pages.push(page);
                 }, 
                 Err(e) => {
-                    println!("encountered error when parsing page,
-                         move to next archive: {:?}", e);
+                    println!("encountered error when parsing page, move to next archive: {:?}", e);
                     break;
                 }, 
             }
@@ -288,7 +287,7 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ParseError::NoPageFound => {
-                write!(f, "no page found")
+                write!(f, "no v2 page found")
             }, 
             ParseError::InvalidHeader => {
                 write!(f, "invalid header")
