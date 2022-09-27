@@ -4,12 +4,15 @@ use std::fs;
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about=None)]
 pub struct ArgParse {
-    #[clap(short, long, value_parser,
-        default_value = "/System/Volumes/Data/.fseventsd")]
+    #[clap(
+        short,
+        long,
+        value_parser,
+        default_value = "/System/Volumes/Data/.fseventsd"
+    )]
     pub input_path: String,
 
-    #[clap(short, long, value_parser,
-        default_value = "./output.json")]
+    #[clap(short, long, value_parser, default_value = "./output.json")]
     pub output_path: String,
 
     #[clap(short, long, value_enum,
@@ -25,7 +28,6 @@ pub enum ArgsOutputFormat {
 }
 
 pub fn validate_args(args: &ArgParse) -> bool {
-
     // check input file existence
     if let Err(err) = fs::read_dir(&args.input_path) {
         println!("invalid input path: {}", err);
