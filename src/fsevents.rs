@@ -117,7 +117,7 @@ impl Page {
     // usize consumed
     pub fn new(mem: &[u8]) -> Result<(Self, usize), Box<dyn std::error::Error>> {
         // find page magic
-        let offset = mem.windows(4).position(|window| window == b"2SLD");
+        let offset = mem.windows(4).position(|window| window == b"1SLD" || window == b"2SLD" || window == b"3SLD");
         let mut offset = offset.unwrap_or(usize::MAX);
         if offset > mem.len() {
             return Err(Box::new(ParseError::NoPageFound));
@@ -125,7 +125,7 @@ impl Page {
 
         // parse header
         let header = PageHeader::new(&mem[offset..])?;
-        if matches!(header.version, Version::V1) {
+        if matches!(header.version, Version::Unknown) {
             return Err(Box::new(ParseError::UnsupportedVersion));
         }
 
@@ -139,12 +139,18 @@ impl Page {
                  * | full path | end with 0x00
                  * | event id | 8 bytes
                  * | event flags | 4 bytes
-                 * | node id | 8 bytes
+                 * | node id | 8 bytes (version >= v2)
+                 * | unknown | 4 bytes (version >= v3)
                  */
 
                 // path can be empty? offset == end_offset
                 let end_offset = offset + path_len;
-                if end_offset + 20 >= mem.len() {
+                let tail_len = match header.version {
+                    Version::V3 => 24, 
+                    Version::V2 => 20,
+                    _ => 12,
+                };
+                if end_offset + tail_len >= mem.len() {
                     // other attributes
                     println!(
                         "invalid record for path, stop parsing page: {:?}",
@@ -167,8 +173,12 @@ impl Page {
                 offset += 4;
                 // println!("event flags: {}", flags);
 
-                // skip node id
-                offset += 8;
+                // skip node id, unknown column
+                match header.version {
+                    Version::V2 => offset += 8,
+                    Version::V3 => offset += 12,
+                    _ => {}
+                }
 
                 // new entry generated
                 entries.push(Entry {
@@ -194,25 +204,28 @@ pub struct PageHeader {
 }
 #[derive(Debug)]
 pub enum Version {
-    Unkown,
+    Unknown,
     V1,
     V2,
+    V3,
 }
 impl PageHeader {
     pub fn new(mem: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
         // validate len
-        if mem.len() < Self::len() + 1 {
+        if mem.len() < Self::len() {
             return Err(Box::new(ParseError::InvalidHeader));
         }
 
         // parse version
-        let mut version = Version::Unkown;
+        let mut version = Version::Unknown;
         if mem.starts_with(b"1SLD") {
             version = Version::V1;
         } else if mem.starts_with(b"2SLD") {
-            version = Version::V2
+            version = Version::V2;
+        } else if mem.starts_with(b"3SLD") {
+            version = Version::V3;
         }
-        if matches!(version, Version::Unkown) {
+        if matches!(version, Version::Unknown) {
             return Err(Box::new(ParseError::InvalidHeader));
         }
 
