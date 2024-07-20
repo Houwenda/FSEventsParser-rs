@@ -33,9 +33,9 @@ page count: 2
 entry count: 1850
 entry count: 880
 % cat ./output.json | tail -n 3
-{"path":"private/var/log/DiagnosticMessages/StoreData\u0000","id":308039,"flags":"FSE_CONTENT_MODIFIED | FSE_IS_FILE","create_ts":1664093703,"modiy_ts":1664093703,"source":"000000000004c323"}
-{"path":"private/var/log/system.log\u0000","id":308036,"flags":"FSE_CONTENT_MODIFIED | FSE_IS_FILE","create_ts":1664093703,"modiy_ts":1664093703,"source":"000000000004c323"}
-{"path":"private/var/root/Library/Logs/Bluetooth/bluetoothd-hci-latest.pklg\u0000","id":309733,"flags":"FSE_CONTENT_MODIFIED | FSE_IS_FILE","create_ts":1664093703,"modiy_ts":1664093703,"source":"000000000004c323"}
+{"path":"private/var/log/DiagnosticMessages/StoreData\u0000","id":308039,"flags":"FSE_CONTENT_MODIFIED | FSE_IS_FILE","create_ts":1664093703,"modify_ts":1664093703,"source":"000000000004c323"}
+{"path":"private/var/log/system.log\u0000","id":308036,"flags":"FSE_CONTENT_MODIFIED | FSE_IS_FILE","create_ts":1664093703,"modify_ts":1664093703,"source":"000000000004c323"}
+{"path":"private/var/root/Library/Logs/Bluetooth/bluetoothd-hci-latest.pklg\u0000","id":309733,"flags":"FSE_CONTENT_MODIFIED | FSE_IS_FILE","create_ts":1664093703,"modify_ts":1664093703,"source":"000000000004c323"}
 ```
 
 Use Sqlite output format.

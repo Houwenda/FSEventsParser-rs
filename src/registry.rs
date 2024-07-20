@@ -28,7 +28,7 @@ pub mod json {
         flags: String, // flag description
 
         create_ts: u64,
-        modiy_ts: u64,
+        modify_ts: u64,
         source: String, // source archive file name
     }
 
@@ -55,7 +55,7 @@ pub mod json {
                             .duration_since(UNIX_EPOCH)
                             .unwrap_or_default()
                             .as_secs(),
-                        modiy_ts: archive
+                        modify_ts: archive
                             .mtime
                             .duration_since(UNIX_EPOCH)
                             .unwrap_or_default()
